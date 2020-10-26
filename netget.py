@@ -3,10 +3,12 @@ import sys
 import json
 import socket
 import urllib.request
+import base64
 from distutils.dir_util import copy_tree
 import zipfile
 import tempfile
 import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +28,20 @@ def retry_on_timeout(fn):
     return fn_with_retry
 
 @retry_on_timeout
-def get_zip_and_extract(url, save_to, skip_first_folder=True):
+def get_zip_and_extract(url, save_to, auth=None, skip_first_folder=True):
     save_to = os.path.abspath(save_to)
     zip_name = 'temp.zip'
     logger.debug('downloading from %s...' % url)
-    with urllib.request.urlopen(url) as zip_src:
+
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor())
+    req = urllib.request.Request(url)
+    if auth:
+        credentials = ('%s:%s' % auth).encode('ascii')
+        credentials = base64.b64encode(credentials)
+        credentials = credentials.decode("ascii")
+        req.add_header('Authorization', 'Basic %s' % credentials)
+    with opener.open(req) as zip_src:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_zip_path = os.path.join(temp_dir, zip_name)
             logger.debug('saving to temporary location %s...' 
@@ -58,9 +69,10 @@ def get_json(url):
 if __name__ == '__main__':
     logging.basicConfig(
         stream=sys.stdout, 
-        encoding='utf-8', 
         level=logging.DEBUG)
     logger = logging.getLogger(__name__)
 
+    # zip_url = 'an url required simple auth'
+    # get_zip_and_extract(zip_url, '.\\q', ('xxxxx', 'xxxxx'), False)
     zip_url = 'https://github.com/jqly/python_utils/archive/main.zip'
-    get_zip_and_extract(zip_url, '.\\')
+    get_zip_and_extract(zip_url, '.\\q')
