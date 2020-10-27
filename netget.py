@@ -27,6 +27,19 @@ def retry_on_timeout(fn):
         return fn(*args, **kwargs)
     return fn_with_retry
 
+def http_basic_auth_credential(auth):
+    cred = ('%s:%s' % auth).encode('ascii')
+    cred = base64.b64encode(cred)
+    cred = cred.decode("ascii")
+    return cred
+
+def url_request(url, auth=None):
+    req = urllib.request.Request(url)
+    if auth:
+        req.add_header('Authorization', 
+            'Basic %s' % http_basic_auth_credential(auth))
+    return req
+
 @retry_on_timeout
 def get_zip_and_extract(url, save_to, auth=None, skip_first_folder=True):
     save_to = os.path.abspath(save_to)
@@ -35,12 +48,7 @@ def get_zip_and_extract(url, save_to, auth=None, skip_first_folder=True):
 
     opener = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor())
-    req = urllib.request.Request(url)
-    if auth:
-        credentials = ('%s:%s' % auth).encode('ascii')
-        credentials = base64.b64encode(credentials)
-        credentials = credentials.decode("ascii")
-        req.add_header('Authorization', 'Basic %s' % credentials)
+    req = url_request(url, auth)
     with opener.open(req) as zip_src:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_zip_path = os.path.join(temp_dir, zip_name)
@@ -61,8 +69,11 @@ def get_zip_and_extract(url, save_to, auth=None, skip_first_folder=True):
                     zf.extractall(path=save_to)
 
 @retry_on_timeout
-def get_json(url):
-    with urllib.request.urlopen(url) as s:
+def get_json(url, auth=None):
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor())
+    req = url_request(url, auth)
+    with opener.open(req) as s:
         html = s.read()
         return json.loads(html)
 
